@@ -1,0 +1,85 @@
+Upstream Author: Krzysztof Witek
+
+Copyright:
+	 Copyright (c) 2014 Krzysztof Witek kw-net.com
+
+License: LGPL-3
+
+Summary
+=======
+
+1.0 Overview
+------------
+
+  1.1 Installation
+  1.2 Running test application
+
+
+2.0 Limitations
+---------------
+
+3.0 Statistics
+--------------
+
+
+
+1.0 Overview
+============
+
+This is an implementation of a high performance multi-core memory pools.
+It allows passing data via remote call procedures without making copies.
+
+A notification mechanism is implemented using kernel's fast event file
+descriptors. An example of use is provided in test.c file.
+
+
+1.1 Installation
+----------------
+
+cd mempool
+# test application without debug symbols
+make
+
+# test application with debug symbols
+make debug
+
+# static and dynamic library
+make lib
+
+1.2 Running test application
+----------------------------
+
+# producer:
+./test -m p
+
+#consumer:
+./test -m c -t 3
+
+
+2.0 Limitations
+===============
+
+- No support of chained buffers.
+- No support of broadcasting data among many readers.
+
+3.0 Statistics
+==============
+
+Simple comparison on a standard PC between unix socket data transfer
+bandwidth and memory pool data transfer bandwidth.
+Only data availability is taken into account, no data filling or reading.
+
+Note that a cost of a data cache miss should be added to the mempool
+results as the cache miss is done in the unix socket results when copying
+data from the socket.
+
+
+cpu MHz         : 1600.000
+model name      : Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
+bench duration: 6 seconds
+
+buf size       bw(MB/s) unix socket     bw(MB/s) mempool
+8                     29                         50
+32                    87                        189
+1024                2022                       6163
+8192                9759                      53618
