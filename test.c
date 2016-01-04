@@ -223,7 +223,7 @@ int main(int argc, char *argv[])
 			break;
 
 		case 't':
-			duration = *optarg - 0x30;
+			duration = atoi(optarg);
 			if (duration < 0 || duration > 3600) {
 				fprintf(stderr, "bad duration %d\n", duration);
 				usage(argv[0]);

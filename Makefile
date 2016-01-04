@@ -11,11 +11,11 @@ DEBUG_CFLAGS  = $(COMMON_CFLAGS) -g -O0
 CFLAGS        = $(COMMON_CFLAGS) -O3 -DNDEBUG
 
 LDFLAGS =
-LIBS    = -lpthread -lrt -lm -ldl
+LIBS    = -lrt
 
 
 $(PROG_NAME): $(PROG_OBJ)
-	$(CC) $(LDFLAGS) $(LIBS) -o $@ $(PROG_OBJ)
+	$(CC) $(LDFLAGS) -o $@ $(PROG_OBJ) $(LIBS)
 
 lib: CFLAGS += -fPIC
 lib: $(OBJ)

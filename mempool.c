@@ -1,7 +1,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -136,7 +135,7 @@ mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
 
 int mp_unregister(mempool_priv_t *mp_priv)
 {
-	int size, i;
+	int size;
 	char name[MEM_POOL_MAX_NAME];
 
 	if (!mp_priv) {
