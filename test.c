@@ -123,26 +123,31 @@ static void producer(void)
 
 		if (unlikely(mp_get(&mp, BKT_MEMPOOL, &buf) < 0)) {
 			/* fprintf(stderr, "no more memory\n"); */
-			write(mp.fds[NOTIF_CONSUMER], &value, sizeof(value));
+			if (write(mp.fds[NOTIF_CONSUMER], &value, sizeof(value)) < 0) {
+				perror("notif consumer");
+			}
 			continue;
 		}
 
 		(void)tosend;
-		/* if (debug) { */
-		/* 	snprintf(buf.buf->data, MEM_POOL_BUF_SIZE, */
-		/* 		 "counter:%ld\n", tosend++); */
-		/* } */
+		if (debug) {
+			snprintf(buf.buf->data, MEM_POOL_BUF_SIZE,
+				 "counter:%ld\n", tosend++);
+		}
 
 		if (unlikely(mp_put(&mp, BKT_CONSUMER, &buf) < 0)) {
 			/* should never happen as BKT_CONSUMER and BKT_MEMPOOL
 			 * are of the same size
 			 */
 			fprintf(stderr, "destination full\n");
+			assert(0);
 		}
 
 		/* notify the consumer every 2048 queries as the write is slow */
 		if (unlikely((started & (2048 - 1)) == 0)) {
-			write(mp.fds[NOTIF_CONSUMER], &value, sizeof(value));
+			if (write(mp.fds[NOTIF_CONSUMER], &value, sizeof(value)) < 0) {
+				perror("notify consumer");
+			}
 		}
 		started++;
 	}
@@ -191,8 +196,8 @@ static void consumer(void)
 	while ((fd_read = read(mp.fds[NOTIF_CONSUMER], &value, sizeof(value)))
 	       >= 0) {
 		while (likely(mp_get(&mp, BKT_CONSUMER, &buf) >= 0)) {
-			/* if (debug) */
-			/*     printf("%s", buf.buf->data); */
+			if (debug)
+			    printf("%s", buf.buf->data);
 			stats += MEM_POOL_BUF_SIZE;
 
 			if (unlikely(mp_free(&mp, &buf) < 0))
