@@ -40,12 +40,12 @@ struct mempool {
 typedef struct mempool mempool_t;
 
 struct mp_ring {
-	int        start;
-	int        end;
-	int        len;
-	spinlock_t lock;
-	int        offset[];
-} __cache_aligned;
+	volatile uint32_t	prod_head;
+	volatile uint32_t	prod_tail;
+	volatile uint32_t	cons_head __cache_aligned;
+	volatile uint32_t	cons_tail;
+	int			offset[] __cache_aligned;
+};
 typedef struct mp_ring mp_ring_t;
 
 typedef struct mempool_priv_t {
@@ -67,19 +67,18 @@ mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 {
 	int offset;
 	mp_ring_t *ring = mp_priv->bucket[bucket];
+	uint32_t cons_head, cons_next;
 
 	assert(bucket < mp_priv->mp->buckets);
-	spin_lock(&ring->lock);
-	if (unlikely(ring->start == ring->end && ring->len != mp_priv->entries)) {
-		assert(ring->len == 0);
-		spin_unlock(&ring->lock);
-		return -1;
-	}
-	offset = ring->offset[ring->start];
-	ring->start++;
-	ring->start &= mp_priv->mask;
-	ring->len--;
-	spin_unlock(&ring->lock);
+	do {
+		cons_head = ring->cons_head;
+		cons_next = (cons_head + 1) & mp_priv->mask;
+
+		if (cons_head == ring->prod_tail) {
+			return -1;
+		}
+	} while (!atomic_cmpset_int(&ring->cons_head, cons_head, cons_next));
+	offset = ring->offset[cons_head];
 	buf->offset = offset;
 	buf->buf = &mp_priv->data[offset];
 
@@ -87,6 +86,8 @@ mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 #ifndef NDEBUG
 	buf->buf->owner = -1;
 #endif
+	atomic_store(&ring->cons_tail, cons_next);
+
 	return 0;
 }
 
@@ -94,23 +95,28 @@ static inline int
 mp_put(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 {
 	mp_ring_t *ring = mp_priv->bucket[bucket];
+	uint32_t prod_head, prod_next, cons_tail;
 
 	assert(bucket < mp_priv->mp->buckets);
-	spin_lock(&ring->lock);
+	do {
+		prod_head = ring->prod_head;
+		prod_next = (prod_head + 1) & mp_priv->mask;
+		cons_tail = ring->cons_tail;
 
-	if (unlikely(ring->len >= mp_priv->entries)) {
-		spin_unlock(&ring->lock);
-		return -1;
-	}
+		if ((mp_priv->mask + cons_tail - prod_head) == 0) {
+			return -1;
+		}
+	} while (!atomic_cmpset_int(&ring->prod_head, prod_head, prod_next));
+	ring->offset[prod_head] = buf->offset;
+
 	assert(buf->buf->owner == -1);
 #ifndef NDEBUG
 	buf->buf->owner = bucket;
 #endif
-	ring->offset[ring->end] = buf->offset;
-	ring->end++;
-	ring->end &= mp_priv->mask;
-	ring->len++;
-	spin_unlock(&ring->lock);
+
+	while (ring->prod_tail != prod_head)
+		cpu_spinwait();
+	atomic_store(&ring->prod_tail, prod_next);
 
 	return 0;
 }
@@ -125,9 +131,13 @@ static inline int mp_free(mempool_priv_t *mp_priv, mp_buf_priv_t *buf)
 	return mp_put(mp_priv, 0, buf);
 }
 
-static inline int mp_is_full(mp_ring_t *mp)
+static inline int mp_is_full(mempool_priv_t *mp, int bucket)
 {
-	return mp->len && mp->start == mp->end;
+	mp_ring_t *ring = mp->bucket[bucket];
+
+	uint32_t prod_tail_next = (ring->prod_tail + 1) & mp->mask;
+
+	return !!(prod_tail_next == ring->cons_tail);
 }
 
 #endif /* _MEMPOOL_H_ */

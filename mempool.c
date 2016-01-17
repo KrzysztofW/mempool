@@ -73,7 +73,7 @@ __mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
 	mp_priv->entries = entries;
 
 	/* fill up the 1st ring */
-	for (i = 0; i < entries; i++) {
+	for (i = 0; i < entries - 1; i++) {
 		mp_buf_priv_t buf = {
 			.offset = i,
 #ifndef NDEBUG
@@ -149,15 +149,6 @@ int mp_unregister(mempool_priv_t *mp_priv)
 	if (atomic_sub_fetch(&mp_priv->mp->refcnt, 1) > 0)
 		return 0;
 
-	/* make sure all locks are released (eg: signal catching) */
-	for (i = 0; i < mp_priv->mp->buckets; i++) {
-		if (spin_trylock(&mp_priv->bucket[i]->lock))
-			spin_unlock(&mp_priv->bucket[i]->lock);
-		else {
-			fprintf(stderr, "inconsistent mempool unregister\n");
-			assert(0);
-		}
-	}
 	munmap(mp_priv->mp, size);
 	shm_unlink(name);
 
