@@ -121,7 +121,7 @@ static void producer(void)
 		if (unlikely(quit))
 			cleanup();
 
-		if (unlikely(mp_get(&mp, BKT_MEMPOOL, &buf) < 0)) {
+		if (unlikely(mp_get_sp(&mp, BKT_MEMPOOL, &buf) < 0)) {
 			/* fprintf(stderr, "no more memory\n"); */
 			if (write(mp.fds[NOTIF_CONSUMER], &value, sizeof(value)) < 0) {
 				perror("notif consumer");
@@ -135,7 +135,7 @@ static void producer(void)
 				 "counter:%ld\n", tosend++);
 		}
 
-		if (unlikely(mp_put(&mp, BKT_CONSUMER, &buf) < 0)) {
+		if (unlikely(mp_put_sp(&mp, BKT_CONSUMER, &buf) < 0)) {
 			/* should never happen as BKT_CONSUMER and BKT_MEMPOOL
 			 * are of the same size
 			 */
@@ -195,7 +195,7 @@ static void consumer(void)
 
 	while ((fd_read = read(mp.fds[NOTIF_CONSUMER], &value, sizeof(value)))
 	       >= 0) {
-		while (likely(mp_get(&mp, BKT_CONSUMER, &buf) >= 0)) {
+		while (likely(mp_get_sp(&mp, BKT_CONSUMER, &buf) >= 0)) {
 			if (debug)
 			    printf("%s", buf.buf->data);
 			stats += MEM_POOL_BUF_SIZE;

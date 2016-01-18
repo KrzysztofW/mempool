@@ -13,6 +13,7 @@ typedef struct mp_ring {
 	void               *data[] __cache_aligned;
 } mp_ring_t;
 
+/* ring get MP safe */
 static inline int mp_ring_get(mp_ring_t *ring, void **ptr)
 {
 	uint32_t cons_head, cons_next;
@@ -32,6 +33,7 @@ static inline int mp_ring_get(mp_ring_t *ring, void **ptr)
 	return 0;
 }
 
+/* ring put MP safe */
 static inline int mp_ring_put(mp_ring_t *ring, void *ptr)
 {
 	uint32_t prod_head, prod_next, cons_tail;
@@ -50,6 +52,45 @@ static inline int mp_ring_put(mp_ring_t *ring, void *ptr)
 	while (ring->prod_tail != prod_head)
 		cpu_spinwait();
 	atomic_store(&ring->prod_tail, prod_next);
+
+	return 0;
+}
+
+/* ring get SP safe */
+static inline int mp_ring_get_sp(mp_ring_t *ring, void **ptr)
+{
+	uint32_t cons_head, cons_next;
+
+	cons_head = ring->cons_head;
+	cons_next = (cons_head + 1) & ring->mask;
+
+	if (cons_head == ring->prod_tail)
+		return -1;
+
+	ring->cons_head = cons_next;
+	ring->cons_tail = cons_next;
+
+	*ptr =  ring->data[cons_head];
+
+	return 0;
+}
+
+/* ring put SP safe */
+static inline int mp_ring_put_sp(mp_ring_t *ring, void *ptr)
+{
+	uint32_t prod_head, prod_next, cons_tail;
+
+	prod_head = ring->prod_head;
+	prod_next = (prod_head + 1) & ring->mask;
+	cons_tail = ring->cons_tail;
+
+	if ((ring->mask + cons_tail - prod_head) == 0)
+		return -1;
+
+	ring->prod_head = prod_next;
+	ring->data[prod_head] = ptr;
+
+	ring->prod_tail = prod_next;
 
 	return 0;
 }

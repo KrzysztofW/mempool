@@ -50,7 +50,7 @@ int mp_unregister(mempool_priv_t *mp_priv);
 int mp_register(mempool_priv_t *mp_priv, const char *name);
 
 static inline int
-mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
+__mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf, int mp)
 {
 	uintptr_t offset;
 	void *ptr;
@@ -58,8 +58,13 @@ mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 
 	assert(bucket < mp_priv->mp->buckets);
 
-	if (mp_ring_get(ring, &ptr) < 0)
-		return -1;
+	if (mp) {
+		if (mp_ring_get(ring, &ptr) < 0)
+			return -1;
+	} else {
+		if (mp_ring_get_sp(ring, &ptr) < 0)
+			return -1;
+	}
 
 	offset = (uintptr_t)ptr;
 	buf->offset = offset;
@@ -72,23 +77,55 @@ mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 	return 0;
 }
 
+/* mempool get MP safe */
 static inline int
-mp_put(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
+mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
+{
+	return __mp_get(mp_priv, bucket, buf, 1);
+}
+
+/* mempool get SP safe */
+static inline int
+mp_get_sp(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
+{
+	return __mp_get(mp_priv, bucket, buf, 0);
+}
+
+static inline int
+__mp_put(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf, int mp)
 {
 	mp_ring_t *ring = mp_priv->bucket[bucket];
 	void *ptr = (void *)buf->offset;
 
 	assert(bucket < mp_priv->mp->buckets);
 
-	if (mp_ring_put(ring, ptr) < 0)
-		return -1;
-
+	if (mp) {
+		if (mp_ring_put(ring, ptr) < 0)
+			return -1;
+	} else {
+		if (mp_ring_put_sp(ring, ptr) < 0)
+			return -1;
+	}
 	buf->offset = (uintptr_t)ptr;
 	assert(buf->buf->owner == -1);
 #ifndef NDEBUG
 	buf->buf->owner = bucket;
 #endif
 	return 0;
+}
+
+/* mempool put MP safe */
+static inline int
+mp_put(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
+{
+	return __mp_put(mp_priv, bucket, buf, 1);
+}
+
+/* mempool put SP safe */
+static inline int
+mp_put_sp(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
+{
+	return __mp_put(mp_priv, bucket, buf, 0);
 }
 
 static inline int mp_alloc(mempool_priv_t *mp_priv, mp_buf_priv_t *buf)
