@@ -79,6 +79,8 @@ mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 		}
 	} while (!atomic_cmpset_int(&ring->cons_head, cons_head, cons_next));
 	offset = ring->offset[cons_head];
+	atomic_store(&ring->cons_tail, cons_next);
+
 	buf->offset = offset;
 	buf->buf = &mp_priv->data[offset];
 
@@ -86,7 +88,6 @@ mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 #ifndef NDEBUG
 	buf->buf->owner = -1;
 #endif
-	atomic_store(&ring->cons_tail, cons_next);
 
 	return 0;
 }
@@ -109,14 +110,14 @@ mp_put(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 	} while (!atomic_cmpset_int(&ring->prod_head, prod_head, prod_next));
 	ring->offset[prod_head] = buf->offset;
 
+	while (ring->prod_tail != prod_head)
+		cpu_spinwait();
+	atomic_store(&ring->prod_tail, prod_next);
+
 	assert(buf->buf->owner == -1);
 #ifndef NDEBUG
 	buf->buf->owner = bucket;
 #endif
-
-	while (ring->prod_tail != prod_head)
-		cpu_spinwait();
-	atomic_store(&ring->prod_tail, prod_next);
 
 	return 0;
 }
