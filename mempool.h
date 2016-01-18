@@ -103,11 +103,7 @@ static inline int mp_free(mempool_priv_t *mp_priv, mp_buf_priv_t *buf)
 
 static inline int mp_is_full(mempool_priv_t *mp, int bucket)
 {
-	mp_ring_t *ring = mp->bucket[bucket];
-
-	uint32_t prod_tail_next = (ring->prod_tail + 1) & ring->mask;
-
-	return !!(prod_tail_next == ring->cons_tail);
+	return mp_ring_is_full(mp->bucket[bucket]);
 }
 
 #endif /* _MEMPOOL_H_ */

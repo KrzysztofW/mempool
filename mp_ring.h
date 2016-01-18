@@ -54,4 +54,16 @@ static inline int mp_ring_put(mp_ring_t *ring, void *ptr)
 	return 0;
 }
 
+static inline int mp_ring_is_full(mp_ring_t *ring)
+{
+	uint32_t prod_tail_next = (ring->prod_tail + 1) & ring->mask;
+
+	return !!(prod_tail_next == ring->cons_tail);
+}
+
+static inline int mp_ring_size(mp_ring_t *ring)
+{
+	return ring->mask;
+}
+
 #endif
