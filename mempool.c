@@ -16,12 +16,12 @@ static int
 __mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
 	    unsigned int buckets)
 {
-	int fd, i;
+	int fd, i, mask = entries - 1;
 	mempool_t *mp;
 
 	int size = sizeof(mempool_t)
-		+ (sizeof(mp_ring_t) + sizeof(int) * entries) * buckets
-		+ entries * sizeof(mp_buf_t);
+		+ (sizeof(mp_ring_t) + sizeof(void *) * entries) * buckets
+		+  sizeof(mp_buf_t) * entries;
 
 	if (buckets < 2 || buckets > MEM_POOL_MAX_BUCKETS) {
 		fprintf(stderr, "number of buckets must be greater than 1 and "
@@ -56,20 +56,22 @@ __mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
 
 	mp_priv->mp = mp;
 	mp_priv->bucket[0] = (mp_ring_t *)((char *)mp + sizeof(mempool_t));
+	mp_priv->bucket[0]->mask = mask;
 
 	for (i = 1; i < buckets; i++) {
-		mp_priv->bucket[i] = (mp_ring_t *)((char *)mp_priv->bucket[i-1]
-						   + sizeof(mp_ring_t)
-						   + sizeof(int) * entries);
+		mp_ring_t *ring = (mp_ring_t *)((char *)mp_priv->bucket[i-1]
+						+ sizeof(mp_ring_t)
+						+ sizeof(void *) * entries);
+		ring->mask = mask;
+		mp_priv->bucket[i] = ring;
 	}
 	mp_priv->data = (mp_buf_t *)((char *)mp_priv->bucket[buckets-1]
-		      + sizeof(mp_ring_t) + sizeof(int) * entries);
+		      + sizeof(mp_ring_t) + sizeof(void *) * entries);
 
-	if ((long)mp_priv->data & __cache_line_mask) {
+	if ((uintptr_t)mp_priv->data & __cache_line_mask) {
 		fprintf(stderr, "mp_priv->data not cache aligned\n");
 		goto error;
 	}
-	mp_priv->mask = entries - 1;
 	mp_priv->entries = entries;
 
 	/* fill up the 1st ring */
@@ -183,21 +185,19 @@ int mp_register(mempool_priv_t *mp_priv, const char *name)
 	}
 
 	mp_priv->mp = mp;
-	entries = mp->entries;
-	mp_priv->entries = entries;
-	mp_priv->mask = entries - 1;
+	entries = mp_priv->entries = mp->entries;
 	memset(mp_priv->fds, -1, sizeof(int) * MEM_POOL_MAX_FDS);
 
 	mp_priv->bucket[0] = (mp_ring_t *)((char *)mp + sizeof(mempool_t));
 	for (i = 1; i < mp->buckets; i++) {
 		mp_priv->bucket[i] = (mp_ring_t *)((char *)mp_priv->bucket[i-1]
 						   + sizeof(mp_ring_t)
-						   + sizeof(int) * entries);
+						   + sizeof(void *) * entries);
 	}
 
 	mp_priv->data = (mp_buf_t *)((char *)mp_priv->bucket[mp->buckets-1]
-		      + sizeof(mp_ring_t) + sizeof(int) * entries);
-	if ((long)mp_priv->data & __cache_line_mask) {
+		      + sizeof(mp_ring_t) + sizeof(void *) * entries);
+	if ((uintptr_t)mp_priv->data & __cache_line_mask) {
 		fprintf(stderr, "buf not cache aligned\n");
 		goto error;
 	}

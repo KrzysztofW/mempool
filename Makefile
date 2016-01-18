@@ -28,7 +28,7 @@ debug: $(PROG_NAME)
 %.c:
 	$(CC) $(DCFLAGS) $*.c
 
-mempool.o: mempool.h atomic.h
+mempool.o: mempool.h atomic.h mp_ring.h
 sendfd.o: sendfd.h
 
 clean:
