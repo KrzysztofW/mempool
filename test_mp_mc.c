@@ -171,7 +171,7 @@ static void consumer()
 	gettimeofday(&tv_start, NULL);
 
 	while (1) {
-		while (likely(mp_get_sp(&mp, BKT_CONSUMER, &buf) >= 0)) {
+		while (likely(mp_get(&mp, BKT_CONSUMER, &buf) >= 0)) {
 			if (debug)
 			    printf("%s", buf.buf->data);
 			stats += MEM_POOL_BUF_SIZE;
