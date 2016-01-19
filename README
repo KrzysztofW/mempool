@@ -50,10 +50,10 @@ make lib
 ----------------------------
 
 # producer:
-./test -m p
+./test_sp_sc -m p
 
 #consumer:
-./test -m c -t 3
+./test_sp_sc -m c -t 3
 
 
 2.0 Limitations
@@ -61,25 +61,3 @@ make lib
 
 - No support of chained buffers.
 - No support of broadcasting data among many readers.
-
-3.0 Statistics
-==============
-
-Simple comparison on a standard PC between unix socket data transfer
-bandwidth and memory pool data transfer bandwidth.
-Only data availability is taken into account, no data filling or reading.
-
-Note that a cost of a data cache miss should be added to the mempool
-results as the cache miss is done in the unix socket results when copying
-data from the socket.
-
-
-cpu MHz         : 1600.000
-model name      : Intel(R) Core(TM) i5-3470 CPU @ 3.20GHz
-bench duration: 6 seconds
-
-buf size       bw(MB/s) unix socket     bw(MB/s) mempool
-8                     29                         50
-32                    87                        189
-1024                2022                       6163
-8192                9759                      53618
