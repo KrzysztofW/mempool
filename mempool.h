@@ -49,6 +49,7 @@ int mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
 int mp_unregister(mempool_priv_t *mp_priv);
 int mp_register(mempool_priv_t *mp_priv, const char *name);
 int mp_create_notifs(mempool_priv_t *mp_priv, unsigned notifications);
+void mp_retain(mempool_t *mp);
 
 static inline int
 __mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf, int mp)

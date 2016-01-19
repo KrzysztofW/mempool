@@ -159,10 +159,15 @@ int mp_unregister(mempool_priv_t *mp_priv)
 	return 0;
 }
 
+void mp_retain(mempool_t *mp)
+{
+	atomic_add_fetch(&mp->refcnt, 1);
+}
+
 int mp_register(mempool_priv_t *mp_priv, const char *name)
 {
 	int fd;
-	int size, buckets;
+	int size;
 	mempool_t *mp;
 	int i, entries;
 
@@ -179,12 +184,7 @@ int mp_register(mempool_priv_t *mp_priv, const char *name)
 		return -1;
 	}
 
-	buckets = atomic_add_fetch(&mp->refcnt, 1);
-	if (buckets > mp->buckets) {
-		fprintf(stderr, "can't exceed %d registrations\n",
-			mp->buckets);
-		goto error;
-	}
+	mp_retain(mp);
 
 	mp_priv->mp = mp;
 	entries = mp_priv->entries = mp->entries;
