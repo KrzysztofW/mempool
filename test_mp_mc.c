@@ -19,11 +19,6 @@ typedef enum bucket {
 	BKT_COUNT,
 } bucket;
 
-typedef enum notifs {
-	NOTIF_CONSUMER,
-	NOTIF_COUNT,
-} notifs;
-
 uint64_t stats;
 struct timeval tv_start;
 struct timeval tv_end;
@@ -34,11 +29,12 @@ int quit;
 
 static void usage(char *name)
 {
-	fprintf(stderr, "Usage: %s -m p|c [-d] [-t]\n"
+	fprintf(stderr, "Usage: %s -m p|c [-d] [-t] [-r]\n"
 		"\n"
-		"p - producer\n"
-		"c - consumer\n"
-		"t - duration (in seconds)\n",
+		"m p|c - producer/consumer\n"
+		"t     - duration (in seconds)\n"
+		"d     - debug mode\n"
+		"r     - register only (don't create the shared memory)\n",
 		name);
 	exit(EXIT_FAILURE);
 }
@@ -91,28 +87,25 @@ static void dump_infos(mempool_priv_t *mp)
 	}
 }
 
-static void producer(void)
+static void producer(int register_only)
 {
-	uint64_t tosend = 0, value;
+	uint64_t tosend = 0;
 	mp_buf_priv_t buf;
 
-	if (mp_create(&mp, MP_NAME, MP_ENTRIES, BKT_COUNT) < 0) {
-		fprintf(stderr, "can't create shared memory\n");
-		return;
-	}
-
-	if (mp_create_notifs(&mp, NOTIF_COUNT) < 0) {
-		fprintf(stderr, "failed creating eventfd notifications\n");
-		return;
+	if (register_only == 0) {
+		if (mp_create(&mp, MP_NAME, MP_ENTRIES, BKT_COUNT) < 0) {
+			fprintf(stderr, "can't create shared memory\n");
+			return;
+		}
+	} else {
+		if (mp_register(&mp, MP_NAME) < 0) {
+			fprintf(stderr, "can't register shared memory\n");
+			return;
+		}
 	}
 
 	if (debug)
 		dump_infos(&mp);
-
-	if (mp_cmd_wait_fork(&mp) < 0) {
-		mp_unregister(&mp);
-		return;
-	}
 
 	if (signal(SIGINT, set_quit) == SIG_ERR) {
 		fprintf(stderr, "\ncan't catch SIGINT\n");
@@ -121,58 +114,37 @@ static void producer(void)
 	}
 
 	while (1) {
-		static unsigned int started;
-
 		if (unlikely(quit))
 			cleanup();
 
-		if (unlikely(mp_get_sp(&mp, BKT_MEMPOOL, &buf) < 0)) {
+		if (unlikely(mp_get(&mp, BKT_MEMPOOL, &buf) < 0)) {
 			/* fprintf(stderr, "no more memory\n"); */
-			if (write(mp.fds[NOTIF_CONSUMER], &value, sizeof(value)) < 0) {
-				perror("notif consumer");
-			}
 			continue;
 		}
 
-		(void)tosend;
 		if (debug) {
 			snprintf(buf.buf->data, MEM_POOL_BUF_SIZE,
 				 "counter:%ld\n", tosend++);
 		}
 
-		if (unlikely(mp_put_sp(&mp, BKT_CONSUMER, &buf) < 0)) {
+		if (unlikely(mp_put(&mp, BKT_CONSUMER, &buf) < 0)) {
 			/* should never happen as BKT_CONSUMER and BKT_MEMPOOL
 			 * are of the same size
 			 */
 			fprintf(stderr, "destination full\n");
 			assert(0);
 		}
-
-		/* notify the consumer every 2048 queries as the write is slow */
-		if (unlikely((started & (2048 - 1)) == 0)) {
-			if (write(mp.fds[NOTIF_CONSUMER], &value, sizeof(value)) < 0) {
-				perror("notify consumer");
-			}
-		}
-		started++;
 	}
 
 	mp_unregister(&mp);
 }
 
-static void consumer(void)
+static void consumer()
 {
 	mp_buf_priv_t buf;
-	int fd_read;
-	uint64_t value;
 
 	if (mp_register(&mp, MP_NAME) < 0) {
 		fprintf(stderr, "can't register shared memory\n");
-		return;
-	}
-
-	if (mp_send_cmd(&mp, SEND_FDS) < 0) {
-		mp_unregister(&mp);
 		return;
 	}
 
@@ -198,22 +170,20 @@ static void consumer(void)
 
 	gettimeofday(&tv_start, NULL);
 
-	while ((fd_read = read(mp.fds[NOTIF_CONSUMER], &value, sizeof(value)))
-	       >= 0) {
+	while (1) {
 		while (likely(mp_get_sp(&mp, BKT_CONSUMER, &buf) >= 0)) {
 			if (debug)
 			    printf("%s", buf.buf->data);
 			stats += MEM_POOL_BUF_SIZE;
 
-			if (unlikely(mp_free(&mp, &buf) < 0))
+			if (unlikely(mp_free(&mp, &buf) < 0)) {
 				fprintf(stderr, "can't free buffer\n");
+				break;
+			}
 			if (unlikely(quit))
 				cleanup();
 		}
 	}
-
-	if (fd_read < 0)
-		fprintf(stderr, "read from eventfd failed ret=%d\n", fd_read);
 
 	mp_unregister(&mp);
 }
@@ -221,8 +191,9 @@ static void consumer(void)
 int main(int argc, char *argv[])
 {
 	int opt, mode = 0;
+	int register_only = 0;
 
-	while ((opt = getopt(argc, argv, "m:dt:")) != -1) {
+	while ((opt = getopt(argc, argv, "m:dt:r")) != -1) {
 		switch (opt) {
 		case 'm':
 			mode = *optarg;
@@ -240,6 +211,10 @@ int main(int argc, char *argv[])
 			}
 			break;
 
+		case 'r':
+			register_only = 1;
+			break;
+
 		default:
 			usage(argv[0]);
 		}
@@ -247,7 +222,7 @@ int main(int argc, char *argv[])
 
 	switch (mode) {
 	case 'p':
-		producer();
+		producer(register_only);
 		break;
 
 	case 'c':
