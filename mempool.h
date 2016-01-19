@@ -64,7 +64,7 @@ __mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf, int mp)
 		if (mp_ring_get(ring, &ptr) < 0)
 			return -1;
 	} else {
-		if (mp_ring_get_sp(ring, &ptr) < 0)
+		if (mp_ring_get_sc(ring, &ptr) < 0)
 			return -1;
 	}
 
@@ -79,16 +79,16 @@ __mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf, int mp)
 	return 0;
 }
 
-/* mempool get MP safe */
+/* mempool get - multi consumer safe */
 static inline int
 mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 {
 	return __mp_get(mp_priv, bucket, buf, 1);
 }
 
-/* mempool get SP safe */
+/* mempool get - single consumer safe */
 static inline int
-mp_get_sp(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
+mp_get_sc(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 {
 	return __mp_get(mp_priv, bucket, buf, 0);
 }
@@ -116,14 +116,14 @@ __mp_put(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf, int mp)
 	return 0;
 }
 
-/* mempool put MP safe */
+/* mempool put - multi producer safe */
 static inline int
 mp_put(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 {
 	return __mp_put(mp_priv, bucket, buf, 1);
 }
 
-/* mempool put SP safe */
+/* mempool put - single producer safe */
 static inline int
 mp_put_sp(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf)
 {

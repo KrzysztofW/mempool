@@ -13,7 +13,7 @@ typedef struct mp_ring {
 	void               *data[] __cache_aligned;
 } mp_ring_t;
 
-/* ring get MP safe */
+/* ring get - multi consumer safe */
 static inline int mp_ring_get(mp_ring_t *ring, void **ptr)
 {
 	uint32_t cons_head, cons_next;
@@ -28,12 +28,12 @@ static inline int mp_ring_get(mp_ring_t *ring, void **ptr)
 	} while (!atomic_cmpset_int(&ring->cons_head, cons_head, cons_next));
 	atomic_store(&ring->cons_tail, cons_next);
 
-	*ptr =  ring->data[cons_head];
+	*ptr = ring->data[cons_head];
 
 	return 0;
 }
 
-/* ring put MP safe */
+/* ring put - multi producer safe */
 static inline int mp_ring_put(mp_ring_t *ring, void *ptr)
 {
 	uint32_t prod_head, prod_next, cons_tail;
@@ -56,8 +56,8 @@ static inline int mp_ring_put(mp_ring_t *ring, void *ptr)
 	return 0;
 }
 
-/* ring get SP safe */
-static inline int mp_ring_get_sp(mp_ring_t *ring, void **ptr)
+/* ring get - single consumer safe */
+static inline int mp_ring_get_sc(mp_ring_t *ring, void **ptr)
 {
 	uint32_t cons_head, cons_next;
 
@@ -75,7 +75,7 @@ static inline int mp_ring_get_sp(mp_ring_t *ring, void **ptr)
 	return 0;
 }
 
-/* ring put SP safe */
+/* ring put - single producer safe */
 static inline int mp_ring_put_sp(mp_ring_t *ring, void *ptr)
 {
 	uint32_t prod_head, prod_next, cons_tail;
