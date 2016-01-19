@@ -1,0 +1,5 @@
+*.o
+*.a
+*.so
+test_mp_mc
+test_sp_sc
