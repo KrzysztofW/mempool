@@ -171,7 +171,7 @@ static void consumer(void)
 		return;
 	}
 
-	if (mp_send_cmd(&mp, SEND_FDS) < 0) {
+	if (mp_send_cmd(&mp, GET_FDS) < 0) {
 		mp_unregister(&mp);
 		return;
 	}

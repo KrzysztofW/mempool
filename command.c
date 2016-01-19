@@ -147,7 +147,7 @@ int mp_send_cmd(mempool_priv_t *mp_priv, fd_cmd_t cmd)
 	}
 
 	switch (cmd) {
-	case SEND_FDS:
+	case GET_FDS:
 		__recv_fds(mp_priv, sock);
 		break;
 
@@ -211,7 +211,7 @@ int mp_cmd_wait_fork(mempool_priv_t *mp_priv)
 		}
 
 		switch (cmd) {
-		case SEND_FDS:
+		case GET_FDS:
 			if (__send_fds(mp_priv, msgsock) < 0)
 				fprintf(stderr,
 					"failed sending file descriptors\n");

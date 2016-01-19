@@ -2,7 +2,7 @@
 #define _COMMAND_H_
 
 typedef enum fd_cmd_t {
-	SEND_FDS,
+	GET_FDS,
 	QUIT,
 } fd_cmd_t;
 
