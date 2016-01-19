@@ -96,8 +96,13 @@ static void producer(void)
 	uint64_t tosend = 0, value;
 	mp_buf_priv_t buf;
 
-	if (mp_create(&mp, MP_NAME, MP_ENTRIES, BKT_COUNT, NOTIF_COUNT) < 0) {
+	if (mp_create(&mp, MP_NAME, MP_ENTRIES, BKT_COUNT) < 0) {
 		fprintf(stderr, "can't create shared memory\n");
+		return;
+	}
+
+	if (mp_create_notifs(&mp, NOTIF_COUNT) < 0) {
+		fprintf(stderr, "failed creating eventfd notifications\n");
 		return;
 	}
 

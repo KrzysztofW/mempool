@@ -45,9 +45,10 @@ typedef struct mempool_priv_t {
 } mempool_priv_t;
 
 int mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
-	      unsigned int buckets, unsigned notifications);
+	      unsigned int buckets);
 int mp_unregister(mempool_priv_t *mp_priv);
 int mp_register(mempool_priv_t *mp_priv, const char *name);
+int mp_create_notifs(mempool_priv_t *mp_priv, unsigned notifications);
 
 static inline int
 __mp_get(mempool_priv_t *mp_priv, int bucket, mp_buf_priv_t *buf, int mp)

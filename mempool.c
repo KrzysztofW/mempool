@@ -12,9 +12,8 @@
 #include "mempool.h"
 
 
-static int
-__mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
-	    unsigned int buckets)
+int mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
+	      unsigned int buckets)
 {
 	int fd, i, mask = entries - 1;
 	mempool_t *mp;
@@ -53,6 +52,8 @@ __mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
 	mp->entries = entries;
 	strncpy(mp->name, name, MEM_POOL_MAX_NAME);
 	mp->buckets = buckets;
+
+	memset(mp_priv->fds, -1, sizeof(int) * MEM_POOL_MAX_FDS);
 
 	mp_priv->mp = mp;
 	mp_priv->bucket[0] = (mp_ring_t *)((char *)mp + sizeof(mempool_t));
@@ -105,9 +106,7 @@ __mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
 	return -1;
 }
 
-int
-mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
-	  unsigned int buckets, unsigned notifications)
+int mp_create_notifs(mempool_priv_t *mp_priv, unsigned notifications)
 {
 	int i;
 
@@ -117,18 +116,16 @@ mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
 		return -1;
 	}
 
-	memset(mp_priv->fds, -1, sizeof(int) * MEM_POOL_MAX_FDS);
-
-	if (__mp_create(mp_priv, name, entries, buckets) < 0)
-		return -1;
-
 	for (i = 0; i < notifications; i++) {
-		int efd = eventfd(0, 0);
+		int efd;
 
-		if (efd < 0) {
-			mp_unregister(mp_priv);
+		if (mp_priv->fds[i] != -1)
 			return -1;
-		}
+
+		efd = eventfd(0, 0);
+		if (efd < 0)
+			return -1;
+
 		mp_priv->fds[i] = efd;
 	}
 
@@ -137,7 +134,7 @@ mp_create(mempool_priv_t *mp_priv, const char *name, unsigned int entries,
 
 int mp_unregister(mempool_priv_t *mp_priv)
 {
-	int size;
+	int size, i;
 	char name[MEM_POOL_MAX_NAME];
 
 	if (!mp_priv) {
@@ -150,6 +147,11 @@ int mp_unregister(mempool_priv_t *mp_priv)
 
 	if (atomic_sub_fetch(&mp_priv->mp->refcnt, 1) > 0)
 		return 0;
+
+	for (i = 0; i < MEM_POOL_MAX_FDS && mp_priv->fds[i] != -1; i++) {
+		close(mp_priv->fds[i]);
+		mp_priv->fds[i] = -1;
+	}
 
 	munmap(mp_priv->mp, size);
 	shm_unlink(name);
