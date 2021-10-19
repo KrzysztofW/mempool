@@ -52,7 +52,7 @@ make lib
 # producer:
 ./test_sp_sc -m p
 
-#consumer:
+# consumer:
 ./test_sp_sc -m c -t 3
 
 
